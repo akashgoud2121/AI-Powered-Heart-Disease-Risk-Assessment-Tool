@@ -1,21 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.routers import predict  # Change back to use full path
+from src.api.routers import predict
 
-app = FastAPI()
+app = FastAPI(
+    title="Heart Disease Prediction API",
+    description="API for predicting heart disease risk",
+    version="1.0.0"
+)
 
-# Allow CORS for all origins
+# Add CORS middleware for Render deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Update with your Streamlit app URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include the prediction router
 app.include_router(predict.router)
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to the Heart Disease Prediction API"}
+async def root():
+    return {"status": "healthy", "message": "Heart Disease Prediction API is running"}
