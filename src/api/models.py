@@ -1,21 +1,18 @@
 from pydantic import BaseModel
 
-class HeartDiseaseInput(BaseModel):
+class PredictionRequest(BaseModel):
     age: int
     sex: int
-    cp: int
-    trestbps: int
-    chol: int
-    fbs: int
-    restecg: int
-    thalach: int
-    exang: int
-    oldpeak: float
-    slope: int
-    ca: int
-    thal: int
-    target: int
+    ChestPainType: int
+    RestingBp: float
+    Cholesterol: float
+    FastingBS: int
+    RestingECG: int
+    MaxHR: int
+    ExerciseAngina: int
+    Oldpeak: float
+    ST_Slope: int
 
-class HeartDiseasePrediction(BaseModel):
-    prediction: int
-    probability: float
+class PredictionResponse(BaseModel):
+    heart_disease_risk: int
+    confidence: float = None

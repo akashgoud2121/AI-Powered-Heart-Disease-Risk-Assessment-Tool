@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import numpy as np
-from src.utils.model_utils import load_model
-import logging
+import pickle
 import os
+import logging
+from src.api.models import PredictionRequest, PredictionResponse
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Define expected feature names - these match your trained model
+# Define expected feature names
 EXPECTED_FEATURES = [
     'Age', 'RestingBP', 'Cholesterol', 'FastingBS', 'MaxHR', 'Oldpeak', 'Sex_M',
     'ChestPainType_ATA', 'ChestPainType_NAP', 'ChestPainType_TA',
@@ -19,31 +19,32 @@ EXPECTED_FEATURES = [
     'ST_Slope_Up'
 ]
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/random_forest_model.pkl")
+# Model loading with better error handling
+def load_model():
+    model_path = os.path.join(os.path.dirname(__file__), "../../models/random_forest_model.pkl")
+    try:
+        with open(model_path, 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        logger.error(f"Model file not found at {model_path}")
+        raise HTTPException(status_code=500, detail="Model file not found")
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error loading model")
 
-# Load the model once when starting the server
+# Load model on startup
 try:
-    model = load_model(MODEL_PATH)
+    model = load_model()
     logger.info("Model loaded successfully")
 except Exception as e:
-    logger.error(f"Failed to load model: {str(e)}")
-    raise RuntimeError(f"Failed to load model: {str(e)}")
+    logger.error(f"Failed to load model on startup: {str(e)}")
+    model = None
 
-class PredictionRequest(BaseModel):
-    age: int
-    sex: int
-    ChestPainType: int
-    RestingBp: float
-    Cholesterol: float
-    FastingBS: int
-    RestingECG: int
-    MaxHR: int
-    ExerciseAngina: int
-    Oldpeak: float
-    ST_Slope: int
-
-@router.post("/predict")
+@router.post("/predict", response_model=PredictionResponse)
 async def predict(data: PredictionRequest):
+    if model is None:
+        raise HTTPException(status_code=500, detail="Model not available")
+    
     try:
         # Initialize features array
         features = np.zeros(len(EXPECTED_FEATURES))
@@ -82,7 +83,7 @@ async def predict(data: PredictionRequest):
         prediction = model.predict(features.reshape(1, -1))
         result = int(prediction[0])
         
-        return {"heart_disease_risk": result}
+        return PredictionResponse(heart_disease_risk=result)
         
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
@@ -90,5 +91,3 @@ async def predict(data: PredictionRequest):
             status_code=500,
             detail=f"Prediction failed: {str(e)}"
         )
-
-
