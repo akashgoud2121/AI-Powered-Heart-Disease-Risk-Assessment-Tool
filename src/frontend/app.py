@@ -83,37 +83,87 @@ def get_health_recommendations(data, risk_level):
     return recommendations
 
 def create_report_pdf(data, risk_level):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 16)
-    
-    # Title
-    pdf.cell(0, 10, 'Heart Disease Risk Assessment Report', ln=True, align='C')
-    pdf.line(10, 30, 200, 30)
-    
-    # Date and Risk Level
-    pdf.set_font('Arial', '', 12)
-    pdf.cell(0, 10, f'Date: {datetime.now().strftime("%Y-%m-%d %H:%M")}', ln=True)
-    pdf.cell(0, 10, f'Risk Level: {"High" if risk_level else "Low"}', ln=True)
-    
-    # Patient Data
-    pdf.set_font('Arial', 'B', 14)
-    pdf.cell(0, 10, 'Patient Information:', ln=True)
-    pdf.set_font('Arial', '', 12)
-    
-    metrics = [
-        ('Age', data['age']),
-        ('Sex', 'Male' if data['sex'] == 1 else 'Female'),
-        ('Blood Pressure', f"{data['RestingBp']} mmHg"),
-        ('Cholesterol', f"{data['Cholesterol']} mg/dl"),
-        ('Max Heart Rate', data['MaxHR']),
-        ('ST Depression', data['Oldpeak'])
-    ]
-    
-    for label, value in metrics:
-        pdf.cell(0, 10, f'{label}: {value}', ln=True)
-    
-    return pdf.output(dest='S').encode('latin-1')
+    """Create PDF report with proper handling of fpdf2 output types"""
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 16)
+        
+        # Title
+        pdf.cell(0, 10, 'Heart Disease Risk Assessment Report', ln=True, align='C')
+        pdf.line(10, 30, 200, 30)
+        
+        # Date and Risk Level
+        pdf.set_font('Arial', '', 12)
+        pdf.cell(0, 10, f'Date: {datetime.now().strftime("%Y-%m-%d %H:%M")}', ln=True)
+        pdf.cell(0, 10, f'Risk Level: {"High" if risk_level else "Low"}', ln=True)
+        
+        # Patient Data
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(0, 10, 'Patient Information:', ln=True)
+        pdf.set_font('Arial', '', 12)
+        
+        metrics = [
+            ('Age', data['age']),
+            ('Sex', 'Male' if data['sex'] == 1 else 'Female'),
+            ('Blood Pressure', f"{data['RestingBp']} mmHg"),
+            ('Cholesterol', f"{data['Cholesterol']} mg/dl"),
+            ('Max Heart Rate', data['MaxHR']),
+            ('ST Depression', data['Oldpeak'])
+        ]
+        
+        for label, value in metrics:
+            pdf.cell(0, 10, f'{label}: {value}', ln=True)
+        
+        # Add recommendations section
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(0, 10, '', ln=True)  # Empty line
+        pdf.cell(0, 10, 'Health Recommendations:', ln=True)
+        pdf.set_font('Arial', '', 12)
+        
+        recommendations = get_health_recommendations(data, risk_level)
+        for rec in recommendations:
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 10, rec['category'], ln=True)
+            pdf.set_font('Arial', '', 10)
+            for tip in rec['tips']:
+                # Remove emojis for PDF compatibility
+                clean_tip = ''.join(char for char in tip if ord(char) < 256)
+                pdf.cell(0, 5, f'  - {clean_tip}', ln=True)
+            pdf.cell(0, 3, '', ln=True)  # Small spacing
+        
+        # Fix: Handle the PDF output properly for fpdf2
+        pdf_output = pdf.output(dest='S')
+        
+        # Check the type and handle accordingly
+        if isinstance(pdf_output, bytes):
+            return pdf_output
+        elif isinstance(pdf_output, bytearray):
+            return bytes(pdf_output)
+        elif isinstance(pdf_output, str):
+            # For older versions that return string
+            return pdf_output.encode('latin-1')
+        else:
+            # Fallback: try to convert to bytes
+            return bytes(pdf_output)
+            
+    except Exception as e:
+        st.error(f"Error creating PDF: {str(e)}")
+        # Return a simple fallback PDF
+        simple_pdf = FPDF()
+        simple_pdf.add_page()
+        simple_pdf.set_font('Arial', 'B', 16)
+        simple_pdf.cell(0, 10, 'Heart Disease Risk Assessment Report', ln=True, align='C')
+        simple_pdf.set_font('Arial', '', 12)
+        simple_pdf.cell(0, 10, f'Date: {datetime.now().strftime("%Y-%m-%d")}', ln=True)
+        simple_pdf.cell(0, 10, f'Risk Level: {"High" if risk_level else "Low"}', ln=True)
+        simple_pdf.cell(0, 10, 'Please consult with a healthcare provider.', ln=True)
+        
+        output = simple_pdf.output(dest='S')
+        if isinstance(output, (bytes, bytearray)):
+            return bytes(output)
+        else:
+            return output.encode('latin-1')
 
 def init_session_state():
     if 'assessment_history' not in st.session_state:
@@ -395,7 +445,14 @@ if st.button("📋 Generate Risk Assessment"):
         }
 
         with st.spinner('🔄 Analyzing patient data...'):
-            response = requests.post(f"{API_URL}/predict", json=input_data)
+            try:
+                response = requests.post(f"{API_URL}/predict", json=input_data, timeout=30)
+            except requests.exceptions.Timeout:
+                st.error("⏰ Request timed out. Please try again.")
+                st.stop()
+            except requests.exceptions.ConnectionError:
+                st.error("🔌 Unable to connect to the prediction service. Please try again later.")
+                st.stop()
             
         if response.status_code == 200:
             prediction = response.json()
@@ -435,22 +492,33 @@ if st.button("📋 Generate Risk Assessment"):
                     for tip in rec['tips']:
                         st.markdown(f"- {tip}")
 
-            # Generate PDF report
-            pdf = create_report_pdf(input_data, risk_level)
-            st.download_button(
-                label="📄 Download PDF Report",
-                data=pdf,
-                file_name=f"heart_assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                mime="application/pdf"
-            )
+            # Generate PDF report with error handling
+            try:
+                with st.spinner('📄 Generating PDF report...'):
+                    pdf_data = create_report_pdf(input_data, risk_level)
+                    
+                st.download_button(
+                    label="📄 Download PDF Report",
+                    data=pdf_data,
+                    file_name=f"heart_assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as pdf_error:
+                st.warning(f"⚠️ PDF generation failed: {str(pdf_error)}. The assessment results are still valid above.")
             
+        elif response.status_code == 422:
+            st.error("❌ Invalid input data. Please check all fields and try again.")
+            if response.text:
+                st.error(f"Details: {response.text}")
         else:
-            st.error(f"Error: Unable to process the assessment (Status code: {response.status_code})")
+            st.error(f"❌ Server error: Unable to process the assessment (Status: {response.status_code})")
+            if response.text:
+                st.error(f"Details: {response.text}")
             
     except requests.exceptions.ConnectionError:
-        st.error("Unable to connect to the prediction service. Please check if the server is running.")
+        st.error("🔌 Unable to connect to the prediction service. Please check if the server is running.")
     except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
+        st.error(f"❌ An unexpected error occurred: {str(e)}")
 
 # Disclaimer
 st.markdown("---")
