@@ -5,7 +5,7 @@ from fpdf import FPDF
 import base64
 import os
 
-API_URL = os.getenv('API_URL', 'http://localhost:8000')
+API_URL = os.getenv('API_URL', 'https://ai-powered-heart-disease-risk-assessment.onrender.com')
 
 def get_health_recommendations(data, risk_level):
     recommendations = []
