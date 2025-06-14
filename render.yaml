@@ -3,9 +3,22 @@ services:
     name: heart-disease-api
     env: python
     region: singapore
-    python_version: 3.13
-    buildCommand: |
-      python -m pip install --upgrade pip
-      pip install -U setuptools wheel
-      pip install --no-cache-dir -r requirements.txt
+    python_version: "3.11"  # Change to 3.11 for better compatibility
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+
+  - type: web
+    name: heart-disease-frontend
+    env: python
+    region: singapore
+    python_version: "3.11"
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run src/frontend/app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: API_URL
+        value: https://heart-disease-api.onrender.com  # Update with your API URL
+      - key: PYTHON_VERSION
+        value: 3.11

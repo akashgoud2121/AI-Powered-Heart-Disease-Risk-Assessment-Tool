@@ -3,6 +3,9 @@ import requests
 from datetime import datetime
 from fpdf import FPDF
 import base64
+import os
+
+API_URL = os.getenv('API_URL', 'http://localhost:8000')
 
 def get_health_recommendations(data, risk_level):
     recommendations = []
@@ -392,7 +395,7 @@ if st.button("📋 Generate Risk Assessment"):
         }
 
         with st.spinner('🔄 Analyzing patient data...'):
-            response = requests.post("http://localhost:8000/predict", json=input_data)
+            response = requests.post(f"{API_URL}/predict", json=input_data)
             
         if response.status_code == 200:
             prediction = response.json()

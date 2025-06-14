@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import numpy as np
 from src.utils.model_utils import load_model
 import logging
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +19,7 @@ EXPECTED_FEATURES = [
     'ST_Slope_Up'
 ]
 
-MODEL_PATH = "src/models/random_forest_model.pkl"
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "../../models/random_forest_model.pkl")
 
 # Load the model once when starting the server
 try:
