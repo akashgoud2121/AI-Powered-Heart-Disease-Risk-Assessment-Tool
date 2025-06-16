@@ -93,9 +93,9 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 [MIT](https://choosealicense.com/licenses/mit/)
 
 ## Acknowledgments
-- Dataset source: [Provide source if applicable]
+- Dataset source: https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction
 - Medical guidelines and recommendations based on standard healthcare practices
 
 ## Contact
-Your Name - [Your Email]
-Project Link: [GitHub Repository URL]
+E Akash Goud - letsmail.akashgoud@gmail.com
+Project Link: https://github.com/akashgoud2121/AI-Powered-Heart-Disease-Risk-Assessment-Tool.git
